@@ -77,14 +77,14 @@ def t_(key): return T[key][lang]
 # ── 모델 로드 ─────────────────────────────────────────────
 @st.cache_resource
 def load_models():
-    model_Su   = pickle.load(open('model/model_Su.pkl', 'rb'))
-    t0_by_temp = pickle.load(open('model/t0_by_temp.pkl', 'rb'))
+    model_corr = pickle.load(open('model/model_correction.pkl', 'rb'))
+    t0_by_temp = pickle.load(open('model/t0_by_temp.pkl',       'rb'))
     df_params  = pd.read_csv('model/params_fitted.csv')
-    return model_Su, t0_by_temp, df_params
+    return model_corr, t0_by_temp, df_params
 
-model_Su, t0_by_temp, df_params = load_models()
+model_corr, t0_by_temp, df_params = load_models()
 
-R_GAS=8.3144; A_CONST=1e7; E0_FIXED=42466.0; ALPHA_FIXED=0.0076; SU_RMSE=5.2
+R_GAS=8.3144; A_CONST=1e7; E0_FIXED=42466.0; ALPHA_FIXED=0.0076
 
 def t_taae_strength(te, Su, E0, alpha, t0, T_avg):
     T_K   = T_avg + 273.15
@@ -131,8 +131,12 @@ if scm_total > 0.55:
 if fa_b + bfs_b >= 1.0:
     st.sidebar.error(t_('fa_bfs_err')); st.stop()
 
-binder_est=350.0; water_est=w_b*binder_est
-Su_pred=max(float(model_Su.predict([[w_b,fa_b,bfs_b,water_est,binder_est]])[0]),10.0)
+# 교수님 경험식 기반 Su 예측: fc,28 = 73.6 × exp(-0.015 × W/B%)
+# FA/B, BFS/B 보정계수 적용 (단위수량 175 kg/m³ 고정 가정)
+fc_base  = 73.6 * np.exp(-0.015 * w_b * 100)
+corr     = float(model_corr.predict([[fa_b, bfs_b, fa_b*bfs_b]])[0])
+Su_pred  = max(fc_base * corr, 10.0)
+SU_RMSE  = 6.8   # MPa (전체 데이터 기반 RMSE)
 
 st.sidebar.markdown("---")
 st.sidebar.markdown(f"{t_('su_label')} `{Su_pred:.1f} MPa`")
