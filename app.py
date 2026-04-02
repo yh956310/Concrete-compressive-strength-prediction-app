@@ -81,46 +81,50 @@ st.sidebar.markdown(f"**예측 극한강도 (Su):** `{Su_pred:.1f} MPa`")
 st.sidebar.markdown(f"**90% 구간:** `{Su_pred-1.645*SU_RMSE:.1f} ~ {Su_pred+1.645*SU_RMSE:.1f} MPa`")
 
 # ── 메인: 온도이력 입력 ───────────────────────────────────
-st.header("🌡️ 양생 온도 이력 (0~28일)")
-st.markdown("각 날짜의 양생 온도를 설정하세요. 드래그하거나 직접 입력할 수 있습니다.")
+st.header("🌡️ 양생 온도 이력 설정")
+st.markdown("구간별 기간과 온도를 설정하세요. (전체 예측 범위: **0 ~ 91일**)")
 
-col_ctrl1, col_ctrl2, col_ctrl3 = st.columns(3)
-with col_ctrl1:
-    default_temp = st.number_input("기본 온도 (°C)", 0, 40, 20, 1)
-with col_ctrl2:
-    if st.button("🔄 전체 기본값으로 초기화"):
-        for d in range(29):
-            st.session_state[f"temp_day_{d}"] = default_temp
-with col_ctrl3:
-    show_table = st.checkbox("📋 온도 테이블 보기", value=False)
+# ── 구간 기간 설정 ────────────────────────────────────────
+st.markdown("**① 구간 기간 설정**")
+col_p1, col_p2, col_p3 = st.columns(3)
 
-# 온도 입력 (슬라이더 × 29일)
-temp_history = []
-if show_table:
-    # 테이블 형태로 입력
-    cols = st.columns(7)
-    for d in range(29):
-        with cols[d % 7]:
-            key = f"temp_day_{d}"
-            val = st.number_input(f"Day {d}", 0, 40,
-                                  st.session_state.get(key, default_temp), 1, key=key)
-            temp_history.append(val)
-else:
-    # 슬라이더 형태 (구간별)
-    st.markdown("**구간별 온도 설정**")
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        t_early  = st.slider("초기 (1~7일)", 0, 40, default_temp, 1)
-    with c2:
-        t_mid    = st.slider("중기 (8~14일)", 0, 40, default_temp, 1)
-    with c3:
-        t_late   = st.slider("후기 (15~28일)", 0, 40, default_temp, 1)
-    temp_history = [default_temp] + [t_early]*7 + [t_mid]*7 + [t_late]*14
+with col_p1:
+    st.markdown("**초기 (Early)**")
+    st.markdown("시작: `Day 0` (고정)")
+    early_end = st.number_input("종료일 (day)", min_value=1, max_value=89, value=7, step=1, key="early_end")
+
+with col_p2:
+    st.markdown("**중기 (Mid)**")
+    st.markdown(f"시작: `Day {early_end}` (자동)")
+    mid_end = st.number_input("종료일 (day)", min_value=early_end+1, max_value=90, value=min(28, early_end+1), step=1, key="mid_end")
+    mid_end = max(mid_end, early_end + 1)
+
+with col_p3:
+    st.markdown("**후기 (Late)**")
+    st.markdown(f"시작: `Day {mid_end}` (자동)")
+    st.markdown("종료: `Day 91` (고정)")
+
+# ── 구간 온도 설정 ────────────────────────────────────────
+st.markdown("**② 구간 온도 설정**")
+c1, c2, c3 = st.columns(3)
+with c1:
+    t_early = st.slider(f"초기 온도 (Day 0 ~ {early_end})", 0, 40, 20, 1)
+with c2:
+    t_mid   = st.slider(f"중기 온도 (Day {early_end} ~ {mid_end})", 0, 40, 20, 1)
+with c3:
+    t_late  = st.slider(f"후기 온도 (Day {mid_end} ~ 91)", 0, 40, 20, 1)
+
+# 온도이력 배열 생성 (91일)
+temp_history = (
+    [t_early] * early_end +
+    [t_mid]   * (mid_end - early_end) +
+    [t_late]  * (91 - mid_end)
+)
 
 # ── 강도 예측 및 그래프 ───────────────────────────────────
 st.header("📊 압축강도 예측 결과")
 
-ages = np.arange(1, 57)  # 1~56일 예측
+ages = np.arange(1, 92)  # 1~91일 예측
 avg_temp = np.mean(temp_history)
 t0 = get_t0_from_temp(avg_temp, t0_by_temp)
 
@@ -128,8 +132,8 @@ t0 = get_t0_from_temp(avg_temp, t0_by_temp)
 te_by_day = []
 te = 0.0
 T_ref = 20.0
-for d in range(1, 57):
-    T_d = temp_history[min(d-1, 28)] if d <= 29 else avg_temp
+for d in range(1, 92):
+    T_d = temp_history[min(d-1, 90)]
     factor = np.exp(-E0_FIXED / R_GAS * (1/(T_d+273.15) - 1/(T_ref+273.15)))
     te += factor
     te_by_day.append(te)
@@ -144,7 +148,7 @@ strengths_low  = []
 strengths_high = []
 
 for i, te in enumerate(te_by_day):
-    T_d = temp_history[min(i, 28)] if i <= 28 else avg_temp
+    T_d = temp_history[min(i, 90)]
     s_mid  = t_taae_strength(te, Su_pred, E0_FIXED, ALPHA_FIXED, t0, T_d)
     s_low  = t_taae_strength(te, Su_low,  E0_FIXED, ALPHA_FIXED, t0, T_d)
     s_high = t_taae_strength(te, Su_high, E0_FIXED, ALPHA_FIXED, t0, T_d)
@@ -155,28 +159,34 @@ for i, te in enumerate(te_by_day):
 # ── 그래프 ────────────────────────────────────────────────
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
-# 왼쪽: 강도-재령 곡선
+# Left: Strength-Age curve
 ax1.fill_between(ages, strengths_low, strengths_high,
-                 alpha=0.25, color='steelblue', label='90% 신뢰구간')
-ax1.plot(ages, strengths_mid, 'b-', linewidth=2.5, label='예측 강도 (중앙값)')
-ax1.axvline(x=28, color='red', linestyle='--', alpha=0.5, linewidth=1.5, label='28일')
-ax1.set_xlabel('재령 (일)', fontsize=12)
-ax1.set_ylabel('압축강도 (MPa)', fontsize=12)
-ax1.set_title('재령별 압축강도 예측', fontsize=13, fontweight='bold')
+                 alpha=0.25, color='steelblue', label='90% Confidence Interval')
+ax1.plot(ages, strengths_mid, 'b-', linewidth=2.5, label='Predicted Strength (Median)')
+ax1.axvline(x=28, color='red', linestyle='--', alpha=0.5, linewidth=1.5, label='Day 28')
+ax1.set_xlabel('Age (days)', fontsize=12)
+ax1.set_ylabel('Compressive Strength (MPa)', fontsize=12)
+ax1.set_title('Compressive Strength vs. Age', fontsize=13, fontweight='bold')
 ax1.legend(fontsize=10)
 ax1.grid(True, alpha=0.3)
-ax1.set_xlim(0, 56)
+ax1.set_xlim(0, 91)
 ax1.set_ylim(0, max(strengths_high)*1.15)
 
-# 오른쪽: 온도이력
-days_temp = list(range(0, 29))
-ax2.step(days_temp, [temp_history[0]] + list(temp_history[:28]),
-         where='post', color='orangered', linewidth=2.5)
-ax2.fill_between(days_temp, [temp_history[0]]+list(temp_history[:28]),
-                 step='post', alpha=0.15, color='orangered')
-ax2.set_xlabel('재령 (일)', fontsize=12)
-ax2.set_ylabel('양생 온도 (°C)', fontsize=12)
-ax2.set_title('양생 온도 이력', fontsize=13, fontweight='bold')
+# Right: Temperature history
+days_temp = list(range(0, 92))
+temp_plot = temp_history + [temp_history[-1]]
+ax2.step(days_temp, temp_plot, where='post', color='orangered', linewidth=2.5)
+ax2.fill_between(days_temp, temp_plot, step='post', alpha=0.15, color='orangered')
+# 구간 경계선 표시
+ax2.axvline(x=early_end, color='gray', linestyle='--', alpha=0.6, linewidth=1.2)
+ax2.axvline(x=mid_end,   color='gray', linestyle='--', alpha=0.6, linewidth=1.2)
+ax2.text(early_end/2,      42, 'Early', ha='center', fontsize=9, color='gray')
+ax2.text((early_end+mid_end)/2, 42, 'Mid',   ha='center', fontsize=9, color='gray')
+ax2.text((mid_end+91)/2,   42, 'Late',  ha='center', fontsize=9, color='gray')
+ax2.set_xlabel('Age (days)', fontsize=12)
+ax2.set_ylabel('Curing Temperature (°C)', fontsize=12)
+ax2.set_title('Curing Temperature History', fontsize=13, fontweight='bold')
+ax2.set_xlim(0, 91)
 ax2.set_ylim(0, 45)
 ax2.grid(True, alpha=0.3)
 
@@ -188,7 +198,7 @@ plt.close()
 st.header("🔍 특정 재령 강도 조회")
 col1, col2 = st.columns([1, 2])
 with col1:
-    query_age = st.number_input("조회 재령 (일)", 1, 56, 28, 1)
+    query_age = st.number_input("조회 재령 (일)", 1, 91, 28, 1)
 with col2:
     idx = query_age - 1
     s_m = strengths_mid[idx];  s_l = strengths_low[idx];  s_h = strengths_high[idx]
@@ -197,7 +207,7 @@ with col2:
               delta=f"90% 구간: {s_l:.1f} ~ {s_h:.1f} MPa")
 
 # ── 주요 재령 요약 테이블 ─────────────────────────────────
-key_ages = [1, 3, 7, 14, 28, 56]
+key_ages = [1, 3, 7, 14, 28, 56, 91]
 summary = []
 for a in key_ages:
     i = a - 1
