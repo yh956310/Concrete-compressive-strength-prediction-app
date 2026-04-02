@@ -168,11 +168,11 @@ for i,te in enumerate(te_by_day):
 
 # ── 그래프 ────────────────────────────────────────────────
 fig,(ax1,ax2)=plt.subplots(1,2,figsize=(14,5))
-ax1.fill_between(ages,strengths_low,strengths_high,alpha=0.25,color='steelblue',label=t_('graph_ci'))
-ax1.plot(ages,strengths_mid,'b-',linewidth=2.5,label=t_('graph_pred'))
+ax1.fill_between(ages,strengths_low,strengths_high,alpha=0.25,color='steelblue',label='90% Confidence Interval')
+ax1.plot(ages,strengths_mid,'b-',linewidth=2.5,label='Predicted Strength (Median)')
 ax1.axvline(x=28,color='red',linestyle='--',alpha=0.5,linewidth=1.5,label='Day 28')
-ax1.set_xlabel(t_('graph_age'),fontsize=12); ax1.set_ylabel(t_('graph_cs'),fontsize=12)
-ax1.set_title(t_('graph_strength_title'),fontsize=13,fontweight='bold')
+ax1.set_xlabel('Age (days)',fontsize=12); ax1.set_ylabel('Compressive Strength (MPa)',fontsize=12)
+ax1.set_title('Compressive Strength vs. Age',fontsize=13,fontweight='bold')
 ax1.legend(fontsize=10); ax1.grid(True,alpha=0.3)
 ax1.set_xlim(0,91); ax1.set_ylim(0,max(strengths_high)*1.15)
 
@@ -184,8 +184,8 @@ ax2.axvline(x=mid_end,  color='gray',linestyle='--',alpha=0.6,linewidth=1.2)
 ax2.text(early_end/2,          42,'Early',ha='center',fontsize=9,color='gray')
 ax2.text((early_end+mid_end)/2,42,'Mid',  ha='center',fontsize=9,color='gray')
 ax2.text((mid_end+91)/2,       42,'Late', ha='center',fontsize=9,color='gray')
-ax2.set_xlabel(t_('graph_age'),fontsize=12); ax2.set_ylabel(t_('graph_temp_y'),fontsize=12)
-ax2.set_title(t_('graph_temp_title'),fontsize=13,fontweight='bold')
+ax2.set_xlabel('Age (days)',fontsize=12); ax2.set_ylabel('Curing Temperature (°C)',fontsize=12)
+ax2.set_title('Curing Temperature History',fontsize=13,fontweight='bold')
 ax2.set_xlim(0,91); ax2.set_ylim(0,45); ax2.grid(True,alpha=0.3)
 plt.tight_layout(); st.pyplot(fig); plt.close()
 
