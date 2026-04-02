@@ -131,12 +131,12 @@ if scm_total > 0.55:
 if fa_b + bfs_b >= 1.0:
     st.sidebar.error(t_('fa_bfs_err')); st.stop()
 
-# 교수님 경험식 기반 Su 예측: fc,28 = 73.6 × exp(-0.015 × W/B%)
-# FA/B, BFS/B 보정계수 적용 (단위수량 175 kg/m³ 고정 가정)
-fc_base  = 73.6 * np.exp(-0.015 * w_b * 100)
+# 교수님 경험식 기반 Su 예측 (OPC 데이터 재피팅: fc = 99.5 × exp(-0.0203 × W/B%))
+# FA/B, BFS/B 보정계수 적용
+fc_base  = 99.5 * np.exp(-0.0203 * w_b * 100)
 corr     = float(model_corr.predict([[fa_b, bfs_b, fa_b*bfs_b]])[0])
 Su_pred  = max(fc_base * corr, 10.0)
-SU_RMSE  = 6.8   # MPa (전체 데이터 기반 RMSE)
+SU_RMSE  = 6.5   # MPa
 
 st.sidebar.markdown("---")
 st.sidebar.markdown(f"{t_('su_label')} `{Su_pred:.1f} MPa`")
@@ -184,12 +184,22 @@ for d in range(1,92):
     te+=np.exp(-E0_FIXED/R_GAS*(1/(T_d+273.15)-1/(20+273.15)))
     te_by_day.append(te)
 
-strengths_mid,strengths_low,strengths_high=[],[],[]
-for i,te in enumerate(te_by_day):
-    T_d=temp_history[min(i,90)]
-    strengths_mid.append(max(t_taae_strength(te,Su_pred,E0_FIXED,ALPHA_FIXED,t0,T_d),0))
-    strengths_low.append(max(t_taae_strength(te,Su_low, E0_FIXED,ALPHA_FIXED,t0,T_d),0))
-    strengths_high.append(max(t_taae_strength(te,Su_high,E0_FIXED,ALPHA_FIXED,t0,T_d),0))
+strengths_mid, strengths_low, strengths_high = [], [], []
+T_ref = 20.0  # 기준온도: 등가재령 적용 후 강도는 기준온도에서 평가
+prev_mid, prev_low, prev_high = 0.0, 0.0, 0.0  # 단조증가 보장
+
+for i, te in enumerate(te_by_day):
+    # 등가재령(te)은 온도 이력 반영 완료 → 강도는 기준온도(20°C)에서 평가
+    s_mid  = t_taae_strength(te, Su_pred, E0_FIXED, ALPHA_FIXED, t0, T_ref)
+    s_low  = t_taae_strength(te, Su_low,  E0_FIXED, ALPHA_FIXED, t0, T_ref)
+    s_high = t_taae_strength(te, Su_high, E0_FIXED, ALPHA_FIXED, t0, T_ref)
+    # 강도는 물리적으로 감소 불가 (누적값)
+    prev_mid  = max(max(s_mid,  0), prev_mid)
+    prev_low  = max(max(s_low,  0), prev_low)
+    prev_high = max(max(s_high, 0), prev_high)
+    strengths_mid.append(prev_mid)
+    strengths_low.append(prev_low)
+    strengths_high.append(prev_high)
 
 # ── 그래프 ────────────────────────────────────────────────
 fig,(ax1,ax2)=plt.subplots(1,2,figsize=(14,5))
