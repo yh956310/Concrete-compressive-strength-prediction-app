@@ -67,8 +67,8 @@ T = {
     'graph_cs':             {'ko': '압축강도 (MPa)',         'en': 'Compressive Strength (MPa)'},
     'graph_temp_y':         {'ko': '양생 온도 (°C)',         'en': 'Curing Temperature (°C)'},
     'caption': {
-        'ko': '📌 본 예측은 T-TaAE 모델 (Kim et al., 2001) + XGBoost ML 기반입니다. | Chosun University',
-        'en': '📌 Predictions based on T-TaAE model (Kim et al., 2001) + XGBoost ML. | Chosun University'
+        'ko': '📌 본 예측은 T-TaAE 모델 (Kim et al., 2001) + XGBoost ML 기반입니다. 총 6,635개의 실험데이터로부터 확보한 결과를 이용했습니다. | Prof. Hyeongki Kim (Chosun University)',
+        'en': '📌 Predictions based on T-TaAE model (Kim et al., 2001) + XGBoost ML, utilizing results obtained from 6,635 experimental data points. | Prof. Hyeongki Kim (Chosun University)'
     },
 }
 
@@ -103,9 +103,30 @@ st.markdown(t_('subtitle'))
 # ── 사이드바: 배합비 ──────────────────────────────────────
 st.sidebar.markdown("---")
 st.sidebar.header(t_('mix_header'))
-w_b   = st.sidebar.slider(t_('wb'),   0.30, 0.65, 0.45, 0.01)
-fa_b  = st.sidebar.slider(t_('fab'),  0.00, 0.40, 0.10, 0.01)
-bfs_b = st.sidebar.slider(t_('bfsb'), 0.00, 0.60, 0.15, 0.01)
+
+# 구속 조건 안내
+st.sidebar.caption("⚠️ Constrained within training data range" if lang=='en' else "⚠️ 학습 데이터 범위 내로 제한됨")
+
+w_b  = st.sidebar.slider(t_('wb'),  0.30, 0.65, 0.45, 0.01)
+
+# FA/B: 0 ~ 0.40 고정 한계
+fa_b = st.sidebar.slider(t_('fab'), 0.00, 0.40, 0.10, 0.01)
+
+# BFS/B: FA/B에 따라 상한 동적 결정 (FA/B + BFS/B ≤ 0.60)
+bfs_max = round(min(0.40, 0.60 - fa_b), 2)
+bfs_b   = st.sidebar.slider(t_('bfsb'), 0.00, bfs_max,
+                              min(0.15, bfs_max), 0.01)
+
+# 합계 표시
+scm_total = fa_b + bfs_b
+bar_pct   = int(scm_total / 0.60 * 100)
+st.sidebar.markdown(
+    f"**FA/B + BFS/B = `{scm_total:.2f}`** / 0.60 max"
+)
+st.sidebar.progress(bar_pct)
+
+if scm_total > 0.55:
+    st.sidebar.warning("⚠️ Approaching data limit!" if lang=='en' else "⚠️ 학습 데이터 한계에 근접!")
 
 if fa_b + bfs_b >= 1.0:
     st.sidebar.error(t_('fa_bfs_err')); st.stop()
