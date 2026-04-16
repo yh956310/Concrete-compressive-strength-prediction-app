@@ -175,7 +175,8 @@ temp_history=[t_early]*early_end+[t_mid]*(mid_end-early_end)+[t_late]*(91-mid_en
 st.header(t_('result_header'))
 ages=np.arange(1,92)
 avg_temp=np.mean(temp_history)
-t0=get_t0_from_temp(avg_temp,t0_by_temp)
+# t0는 초기 양생온도 기준으로 결정 (avg_temp 사용 시 t0 과대추정 → Day1 강도=0 오류)
+t0=get_t0_from_temp(t_early, t0_by_temp)
 Su_low=max(Su_pred-1.645*SU_RMSE,5.0); Su_high=Su_pred+1.645*SU_RMSE
 
 te_by_day=[]; te=0.0
